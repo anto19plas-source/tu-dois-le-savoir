@@ -669,7 +669,7 @@ Object.keys(MORE3).forEach(k=>{BANK[k].e.push(...MORE3[k].e);BANK[k].h.push(...M
 const QTIME=30;            // secondes pour répondre
 const WEDGES_TO_WIN=CATS.length;
 const MAXP=8;              // joueurs maximum
-const VERSION='v8-2026-11-19';  // repère de version (doit être identique sur tous les appareils)
+const VERSION='v9-2026-11-19';  // repère de version (doit être identique sur tous les appareils)
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rnd=n=>Math.floor(Math.random()*n);
@@ -724,8 +724,9 @@ const BOARD=(function(){
   nodes['H']={x:cx,y:cy,cat:null,type:'hub'};
   for(let s=0;s<6;s++){
     const rp=s*6, ang=-Math.PI/2+rp/36*2*Math.PI;   // la branche part du QG (jonction anneau/rayon)
-    nodes['S'+s+'a']={x:cx+Ra*Math.cos(ang),y:cy+Ra*Math.sin(ang),cat:CATS[(s*2+2)%6].id,type:'cat'};
-    nodes['S'+s+'b']={x:cx+Rb*Math.cos(ang),y:cy+Rb*Math.sin(ang),cat:CATS[(s*2+4)%6].id,type:'cat'};
+    // toute la branche porte la couleur/catégorie de son camembert
+    nodes['S'+s+'a']={x:cx+Ra*Math.cos(ang),y:cy+Ra*Math.sin(ang),cat:CATS[s%6].id,type:'cat'};
+    nodes['S'+s+'b']={x:cx+Rb*Math.cos(ang),y:cy+Rb*Math.sin(ang),cat:CATS[s%6].id,type:'cat'};
     link('R'+rp,'S'+s+'a');link('S'+s+'a','S'+s+'b');link('S'+s+'b','H');
   }
   return {nodes,adj,cx,cy};
