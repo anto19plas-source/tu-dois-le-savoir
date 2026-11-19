@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tu dois le savoir !? — quiz multijoueur</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#5b4be0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tu dois le savoir">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/favicon-64.png">
+<link rel="icon" sizes="192x192" href="icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Firebase (synchro hors de Claude). Bloqué par Claude mais sans effet : dans Claude on utilise la base intégrée. -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -986,10 +995,18 @@ function viewHome(){
     <button class="btn alt" data-act="local">Jouer sur un seul appareil</button>
     <p class="muted center" style="font-size:.9rem;margin:2px 0 0">On se passe le téléphone, chacun son tour.</p>
   </div>
+  ${installHtml()}
   ${legend()}`;
   return h;
 }
 
+function installHtml(){
+  try{if(window.self!==window.top)return ''}catch(_){return ''}   // masqué dans un aperçu intégré
+  if(isStandalone())return '';
+  if(deferredPrompt)return `<div class="card center"><p style="margin:0 0 8px"><b>📲 Installer l'application</b></p><button class="btn" data-act="install">Ajouter à l'écran d'accueil</button></div>`;
+  if(isIOS())return `<div class="card"><p style="margin:0"><b>📲 Installer sur iPhone</b></p><p class="muted" style="margin:6px 0 0;font-size:.9rem">Dans Safari : appuie sur <b>Partager</b> (le carré avec une flèche vers le haut), puis <b>« Sur l'écran d'accueil »</b>.</p></div>`;
+  return '';
+}
 function legend(){return `<div class="legend">${CATS.map(c=>`<span><i style="background:${c.color}"></i>${c.name}</span>`).join('')}</div>`}
 
 function dot(id,idx,clickable){
@@ -1236,6 +1253,7 @@ document.addEventListener('click',e=>{
   else if(a==='next')nextStep();
   else if(a==='skip')skipPlayer();
   else if(a==='rematch')rematch();
+  else if(a==='install'){if(deferredPrompt){const p=deferredPrompt;deferredPrompt=null;p.prompt();if(p.userChoice)p.userChoice.finally(()=>render());render()}}
   else if(a==='leave')leave();
   else if(a==='copy'){try{navigator.clipboard.writeText(code).then(()=>toast('Code copié'),()=>toast('Code : '+code))}catch(err){toast('Code : '+code)}}
 });
@@ -1258,6 +1276,14 @@ function initFirebase(){
     return{doc:wrapDoc,collection:p=>{const r=fs.collection(p);return{get:()=>r.get(),onSnapshot:cb=>r.onSnapshot(cb,e=>toast('Synchro Firebase : '+(e.code||e.message)))}}};
   }catch(e){return null}
 }
+/* ---------- Application installable (PWA) ---------- */
+let deferredPrompt=null;
+const isStandalone=()=>{try{return (window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true}catch(_){return false}};
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent||'');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if(screen==='home')render()});
+window.addEventListener('appinstalled',()=>{deferredPrompt=null;toast('Application installée 🎉');if(screen==='home')render()});
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+
 /* retrait de l'écran de lancement une fois l'animation terminée */
 (function(){const sp=document.getElementById('splash');if(!sp)return;
   const off=()=>{sp.classList.add('gone');};
