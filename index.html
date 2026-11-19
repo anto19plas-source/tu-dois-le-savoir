@@ -106,6 +106,12 @@ body.screen .opts{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 body.screen .opt{font-size:1.5rem;padding:20px 22px}
 body.screen .verdict{font-size:1.8rem}
 .code.big{font-size:6rem}
+.screengame{display:grid;grid-template-columns:minmax(0,440px) 1fr;gap:28px;align-items:start;margin-top:8px}
+@media (max-width:860px){.screengame{grid-template-columns:1fr}}
+.plateau{position:sticky;top:12px}
+.plateau svg{width:100%;height:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.18))}
+.screencol{min-width:0}
+body.screen .screengame .board{flex-wrap:wrap;justify-content:flex-start}
 .screenlobby{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin-top:12px}
 @media (max-width:800px){.screenlobby{grid-template-columns:1fr}}
 </style>
@@ -601,16 +607,42 @@ async function rematch(){
 /* ============================================================
    CONNEXION
    ============================================================ */
-function clearSubs(){unsubs.forEach(u=>{try{typeof u==='function'&&u()}catch(e){}});unsubs=[]}
+let pollIv=null,lastSig='';
+function clearSubs(){unsubs.forEach(u=>{try{typeof u==='function'&&u()}catch(e){}});unsubs=[];if(pollIv){clearInterval(pollIv);pollIv=null}}
 function resetSession(){screenFlag=false;clearSubs();mode=null;code=null;game=null;players={};screen='home';rolling=null;busy=false;store('gc_last',null)}
 
+/* Filet de sécurité : si un événement temps réel est manqué (veille du téléphone,
+   réseau instable), on resynchronise périodiquement et au réveil de l'onglet. */
+async function refreshOnce(){
+  if(mode!=='online'||!dbh||!code)return;
+  try{
+    const g=docData(await dbh.doc('games/'+code).get());
+    if(g)game=g;
+    if(dbh.collection(`games/${code}/players`).get){
+      const next={};colDocs(await dbh.collection(`games/${code}/players`).get()).forEach(p=>{if(p&&p.id)next[p.id]=p});
+      if(Object.keys(next).length)players=next;
+    }
+    if(stateSig()!==lastSig)render();
+  }catch(e){}
+}
 function subscribe(c){
   code=c;mode='online';screen='game';
   unsubs.push(dbh.doc('games/'+c).onSnapshot(s=>{game=docData(s);render()}));
   unsubs.push(dbh.collection(`games/${c}/players`).onSnapshot(s=>{
     const next={};colDocs(s).forEach(p=>{if(p&&p.id)next[p.id]=p});players=next;render()}));
+  if(pollIv)clearInterval(pollIv);
+  pollIv=setInterval(refreshOnce,3000);
   store('gc_last',JSON.stringify({code:c,screen:screenFlag}));
 }
+function stateSig(){
+  if(!game)return 's:'+screen;
+  return JSON.stringify([screen,game.status,game.turn,game.phase,game.q&&game.q.key,game.q&&game.q.t0,
+    game.result&&game.result.choice,game.winner,
+    Object.keys(players).sort().map(id=>[id,(players[id].wedges||[]).length,players[id].ok,players[id].ko])]);
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshOnce()});
+window.addEventListener('focus',refreshOnce);
+window.addEventListener('online',refreshOnce);
 
 async function createOnline(name){
   if(!dbh||!me.id)return fail('Le mode en ligne n\'est pas disponible ici (connexion requise).');
@@ -692,6 +724,7 @@ function render(){
   document.body.classList.toggle('screen',screenFlag&&screen==='game');
   document.body.classList.toggle('focus',screen==='game'&&!!game&&game.status==='playing'&&game.phase!=='roll');
   syncTimer();
+  lastSig=stateSig();
 }
 
 function noticeHtml(){
@@ -787,6 +820,49 @@ function board(){
     return `<div class="pl ${id===activeId()?'active':''} ${id===me.id&&mode==='online'?'me':''}">${pie(p.wedges||[],52)}<div class="nm">${esc(p.name)}</div><div class="sc">${p.ok||0} ✓ · ${p.ko||0} ✗</div></div>`}).join('')}</div>`;
 }
 
+/* couleurs des pions (distinctes des couleurs de catégories) */
+const TOKCOL=['#ff5964','#ffffff','#00d4ff','#c8ff00','#ff9ff3','#ffb703','#a0e548','#ff7ad9'];
+
+/* Plateau visuel pour l'écran de l'ordinateur (mode plateau).
+   Les pions des joueurs se déplacent vers la catégorie tirée. */
+function boardPlateau(){
+  const C=210,Ro=196,Rhub=58,Ricon=150;
+  const aid=activeId();
+  const landed=(game.phase==='question'||game.phase==='result')&&game.q?game.q.cat:null;
+  // secteurs
+  let sec='';
+  CATS.forEach((c,i)=>{
+    const a0=-Math.PI/2+i*Math.PI/3,a1=a0+Math.PI/3,am=a0+Math.PI/6;
+    const x0=C+Ro*Math.cos(a0),y0=C+Ro*Math.sin(a0),x1=C+Ro*Math.cos(a1),y1=C+Ro*Math.sin(a1);
+    const ix=C+Ricon*Math.cos(am),iy=C+Ricon*Math.sin(am);
+    const hot=landed===c.id;
+    sec+=`<path d="M${C} ${C}L${x0.toFixed(1)} ${y0.toFixed(1)}A${Ro} ${Ro} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}Z" fill="${c.color}" fill-opacity="${hot?1:.82}" stroke="#fff" stroke-width="3"/>`;
+    sec+=`<text x="${ix.toFixed(1)}" y="${(iy-6).toFixed(1)}" font-size="34" text-anchor="middle" dominant-baseline="central">${c.icon}</text>`;
+    sec+=`<text x="${ix.toFixed(1)}" y="${(iy+22).toFixed(1)}" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">${esc(c.name)}</text>`;
+  });
+  // position des pions
+  const ids=game.order.filter(id=>players[id]);
+  const home=(idx,nn)=>{const an=-Math.PI/2+idx/Math.max(1,nn)*2*Math.PI;return[C+(Rhub-22)*Math.cos(an),C+(Rhub-22)*Math.sin(an)]};
+  const target=cat=>{const i=CATS.findIndex(c=>c.id===cat),am=-Math.PI/2+i*Math.PI/3+Math.PI/6;return[C+((Ro+Rhub)/2)*Math.cos(am),C+((Ro+Rhub)/2)*Math.sin(am)]};
+  let toks='';
+  ids.forEach((id,idx)=>{
+    const p=players[id],col=TOKCOL[idx%TOKCOL.length],act=id===aid;
+    const [hx,hy]=home(idx,ids.length);
+    const onCat=act&&landed;
+    const [tx,ty]=onCat?target(landed):[hx,hy];
+    const ini=esc((p.name||'?').slice(0,2).toUpperCase());
+    const ring=act?`<circle r="21" fill="none" stroke="#fff" stroke-width="3"/>`:'';
+    const move=onCat?`<animateMotion dur="0.6s" fill="freeze" path="M${(hx-tx).toFixed(1)} ${(hy-ty).toFixed(1)} L0 0"/>`:'';
+    toks+=`<g transform="translate(${tx.toFixed(1)} ${ty.toFixed(1)})">${move}${ring}<circle r="16" fill="${col}" stroke="#15151f" stroke-width="2"/><text y="1" font-size="12" font-weight="800" fill="#15151f" text-anchor="middle" dominant-baseline="central">${ini}</text></g>`;
+  });
+  return `<div class="plateau"><svg viewBox="0 0 ${C*2} ${C*2}" aria-hidden="true">
+    ${sec}
+    <circle cx="${C}" cy="${C}" r="${Rhub}" fill="var(--ink)" stroke="#fff" stroke-width="3"/>
+    <text x="${C}" y="${C}" font-size="15" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">DÉPART</text>
+    ${toks}
+  </svg></div>`;
+}
+
 function viewGame(){
   const aid=activeId(), ap=players[aid];
   if(!ap)return `<div class="card center"><p>Synchronisation…</p></div>`;
@@ -794,6 +870,7 @@ function viewGame(){
   if(game.phase==='roll')main=viewRoll(ap);
   else main=viewQuestion(ap);
   const foot=`<div class="row" style="margin-top:18px">${isHost()&&mode==='online'?`<button class="btn small alt" data-act="skip">Passer ${esc(ap.name)}</button>`:'<span></span>'}<button class="btn small alt" data-act="leave" style="margin-left:auto;flex:0 0 auto">Quitter</button></div>`;
+  if(screenFlag&&mode==='online')return `<div class="screengame">${boardPlateau()}<div class="screencol">${board()}${main}</div></div>${foot}`;
   return board()+main+foot;
 }
 
@@ -912,7 +989,7 @@ function initFirebase(){
       set:d=>r.set(d),update:d=>r.update(d),get:()=>r.get(),
       onSnapshot:cb=>r.onSnapshot(cb,e=>toast('Synchro Firebase : '+(e.code||e.message)))
     }};
-    return{doc:wrapDoc,collection:p=>{const r=fs.collection(p);return{onSnapshot:cb=>r.onSnapshot(cb,e=>toast('Synchro Firebase : '+(e.code||e.message)))}}};
+    return{doc:wrapDoc,collection:p=>{const r=fs.collection(p);return{get:()=>r.get(),onSnapshot:cb=>r.onSnapshot(cb,e=>toast('Synchro Firebase : '+(e.code||e.message)))}}};
   }catch(e){return null}
 }
 (async function init(){
