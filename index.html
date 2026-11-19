@@ -494,6 +494,113 @@ spo:{e:[
 };
 Object.keys(MORE2).forEach(k=>{BANK[k].e.push(...MORE2[k].e);BANK[k].h.push(...MORE2[k].h)});
 
+/* lot 3 : renfort, surtout des questions corsées (h) */
+const MORE3={
+geo:{e:[
+ ["Quelle est la capitale de la Belgique ?","Bruxelles","Anvers","Bruges","Gand"],
+ ["Dans quel pays se trouve la tour de Pise ?","L'Italie","L'Espagne","La Grèce","Le Portugal"],
+ ["Quel océan borde la côte ouest des États-Unis ?","Le Pacifique","L'Atlantique","L'océan Indien","L'Arctique"],
+ ["Quelle est la capitale de la Grèce ?","Athènes","Thessalonique","Le Pirée","Sparte"],
+ ["Quel pays est principalement traversé par le Nil ?","L'Égypte","Le Maroc","La Libye","L'Algérie"]],
+ h:[
+ ["De quel pays Achgabat est-elle la capitale ?","Le Turkménistan","L'Ouzbékistan","Le Tadjikistan","L'Azerbaïdjan"],
+ ["Dans quel pays se trouve l'ancienne cité de Petra ?","La Jordanie","Israël","L'Égypte","Le Liban"],
+ ["Quelle est la capitale de la Slovénie ?","Ljubljana","Bratislava","Zagreb","Sarajevo"],
+ ["Quel est le plus long fleuve d'Europe ?","La Volga","Le Danube","Le Rhin","Le Dniepr"],
+ ["Quelle est la capitale de l'Équateur ?","Quito","Guayaquil","Lima","Bogotá"],
+ ["Quel petit pays est entièrement enclavé dans l'Afrique du Sud ?","Le Lesotho","Le Swaziland (Eswatini)","Le Botswana","Le Malawi"],
+ ["Quelle est la capitale de la Croatie ?","Zagreb","Split","Rijeka","Dubrovnik"],
+ ["Dans quel pays se trouve le désert d'Atacama ?","Le Chili","Le Pérou","La Bolivie","L'Argentine"],
+ ["Quelle mer sépare l'Italie des Balkans ?","La mer Adriatique","La mer Égée","La mer Ionienne","La mer Tyrrhénienne"],
+ ["Quel archipel de l'Équateur est célèbre pour ses tortues géantes ?","Les Galápagos","Les Açores","Les Canaries","Les Baléares"]]},
+div:{e:[
+ ["Quel acteur incarne Harry Potter au cinéma ?","Daniel Radcliffe","Rupert Grint","Elijah Wood","Tom Felton"],
+ ["Quel film d'animation met en scène Woody et Buzz l'Éclair ?","Toy Story","Cars","Monstres et Cie","Là-haut"],
+ ["Quel groupe a chanté « Hey Jude » ?","The Beatles","The Rolling Stones","The Kinks","The Who"],
+ ["Qui chante « Bad Romance » ?","Lady Gaga","Katy Perry","Rihanna","Beyoncé"],
+ ["Dans « Star Wars », qui est le père de Luke Skywalker ?","Dark Vador","Obi-Wan Kenobi","L'empereur Palpatine","Yoda"]],
+ h:[
+ ["Quel réalisateur a signé « La Forme de l'eau » (2017) ?","Guillermo del Toro","Alejandro González Iñárritu","Alfonso Cuarón","Pan's Labyrinth"],
+ ["Quel groupe britannique a sorti l'album « OK Computer » en 1997 ?","Radiohead","Oasis","Blur","Coldplay"],
+ ["Qui a composé la musique du film « Interstellar » ?","Hans Zimmer","John Williams","Howard Shore","Thomas Newman"],
+ ["Dans quelle ville anglaise se déroule la série « Peaky Blinders » ?","Birmingham","Manchester","Liverpool","Leeds"],
+ ["Quel chanteur américain est surnommé « The Boss » ?","Bruce Springsteen","Bob Dylan","Tom Petty","Billy Joel"],
+ ["Qui a réalisé « 2001, l'Odyssée de l'espace » ?","Stanley Kubrick","Ridley Scott","Andreï Tarkovski","George Lucas"],
+ ["Quel est le véritable nom de famille du rappeur Eminem ?","Mathers","Carter","Smith","Young"],
+ ["Quel groupe a enregistré « Stairway to Heaven » ?","Led Zeppelin","Deep Purple","Black Sabbath","Pink Floyd"],
+ ["Quelle actrice a remporté l'Oscar pour « La La Land » ?","Emma Stone","Emma Watson","Ryan Gosling","Natalie Portman"],
+ ["Quel film sud-coréen a remporté la Palme d'or en 2019 ?","Parasite","Burning","Old Boy","Mother"]]},
+his:{e:[
+ ["En quelle année a commencé la Première Guerre mondiale ?","1914","1918","1912","1920"],
+ ["Quel pays a lancé le premier satellite artificiel, Spoutnik ?","L'URSS","Les États-Unis","L'Allemagne","La Chine"],
+ ["En quelle année a eu lieu le débarquement de Normandie ?","1944","1945","1942","1940"],
+ ["Quelle reine d'Égypte s'est donné la mort, selon la légende, par un serpent ?","Cléopâtre","Néfertiti","Hatchepsout","Isis"],
+ ["Quel mur a séparé une ville allemande jusqu'en 1989 ?","Le mur de Berlin","Le mur d'Hadrien","La ligne Maginot","Le mur de l'Atlantique"]],
+ h:[
+ ["En quelle année Constantinople est-elle tombée aux mains des Ottomans ?","1453","1492","1204","1071"],
+ ["Quel empereur romain a proclamé l'édit de Milan en 313 ?","Constantin","Dioclétien","Théodose","Trajan"],
+ ["Quel traité a partagé le Nouveau Monde entre l'Espagne et le Portugal en 1494 ?","Le traité de Tordesillas","Le traité de Westphalie","Le traité d'Utrecht","La paix des Pyrénées"],
+ ["Quelle reine d'Angleterre a régné de 1558 à 1603 ?","Élisabeth Ire","Marie Ire","Victoria","Anne"],
+ ["En quelle année la monarchie a-t-elle été abolie et la République proclamée en France ?","1792","1789","1799","1804"],
+ ["Quel savant a été condamné par l'Inquisition en 1633 pour avoir soutenu l'héliocentrisme ?","Galilée","Copernic","Giordano Bruno","Kepler"],
+ ["Quelle bataille Napoléon a-t-il remportée en 1805 face aux Austro-Russes ?","Austerlitz","Iéna","Wagram","Friedland"],
+ ["Qui a mené la Longue Marche en Chine dans les années 1930 ?","Mao Zedong","Tchang Kaï-chek","Deng Xiaoping","Zhou Enlai"],
+ ["En quelle année le traité de Rome a-t-il fondé la Communauté économique européenne ?","1957","1951","1963","1947"],
+ ["Quel pharaon a fait édifier la grande pyramide de Gizeh ?","Khéops","Khéphren","Mykérinos","Ramsès II"]]},
+art:{e:[
+ ["Quel peintre s'est tranché une partie de l'oreille ?","Vincent van Gogh","Paul Gauguin","Claude Monet","Edgar Degas"],
+ ["Qui a écrit « Les Trois Mousquetaires » ?","Alexandre Dumas","Victor Hugo","Jules Verne","Émile Zola"],
+ ["Quelle couleur obtient-on en mélangeant du bleu et du jaune ?","Le vert","L'orange","Le violet","Le marron"],
+ ["Quel peintre est connu pour ses nombreuses danseuses et ballerines ?","Edgar Degas","Henri Matisse","Auguste Renoir","Paul Cézanne"],
+ ["Quel instrument possède des touches noires et blanches ?","Le piano","La harpe","Le violon","La trompette"]],
+ h:[
+ ["Qui a peint « La Liberté guidant le peuple » ?","Eugène Delacroix","Jacques-Louis David","Théodore Géricault","Gustave Courbet"],
+ ["Qui a écrit le roman « Ulysse », publié en 1922 ?","James Joyce","Marcel Proust","Virginia Woolf","Franz Kafka"],
+ ["Quel compositeur a terminé sa vie atteint de surdité ?","Ludwig van Beethoven","Wolfgang Mozart","Frédéric Chopin","Franz Liszt"],
+ ["Qui a peint le plafond de la chapelle Sixtine ?","Michel-Ange","Raphaël","Léonard de Vinci","Le Titien"],
+ ["Quel poète a écrit « Une saison en enfer » ?","Arthur Rimbaud","Paul Verlaine","Charles Baudelaire","Stéphane Mallarmé"],
+ ["Qui a sculpté le « David » de marbre exposé à Florence ?","Michel-Ange","Donatello","Le Bernin","Cellini"],
+ ["Quel écrivain russe est l'auteur de « Guerre et Paix » ?","Léon Tolstoï","Fiodor Dostoïevski","Ivan Tourgueniev","Anton Tchekhov"],
+ ["Qui a écrit « Don Quichotte » ?","Miguel de Cervantès","Lope de Vega","Dante","Pétrarque"],
+ ["À quel mouvement artistique Claude Monet est-il rattaché ?","L'impressionnisme","Le cubisme","Le romantisme","Le réalisme"],
+ ["Quel architecte a conçu la Cité radieuse de Marseille ?","Le Corbusier","Auguste Perret","Jean Nouvel","Gustave Eiffel"]]},
+sci:{e:[
+ ["Combien de pattes possède un insecte adulte ?","Six","Huit","Quatre","Dix"],
+ ["Quelle étoile éclaire et réchauffe la Terre ?","Le Soleil","Sirius","L'étoile Polaire","Véga"],
+ ["Quel organe permet de respirer ?","Les poumons","Le cœur","Le foie","L'estomac"],
+ ["L'eau est composée d'hydrogène et de quel autre élément ?","L'oxygène","L'azote","Le carbone","Le soufre"],
+ ["Quelle planète habitons-nous ?","La Terre","Mars","Vénus","Jupiter"]],
+ h:[
+ ["Quel est le symbole chimique du sodium ?","Na","So","Sd","Na₂"],
+ ["Comment s'appelle la particule élémentaire de la lumière ?","Le photon","L'électron","Le neutrino","Le proton"],
+ ["Quel savant a énoncé la loi de la gravitation universelle ?","Isaac Newton","Albert Einstein","Galilée","Nicolas Copernic"],
+ ["Quelle est l'unité de la résistance électrique ?","L'ohm","Le volt","L'ampère","Le watt"],
+ ["Combien de paires de chromosomes compte l'être humain ?","23","46","22","24"],
+ ["Quel gaz noble donne la couleur rouge des enseignes lumineuses ?","Le néon","L'argon","Le xénon","L'hélium"],
+ ["Quelle est la planète la plus chaude du système solaire ?","Vénus","Mercure","Mars","Jupiter"],
+ ["Dans quelle partie de la cellule se trouve l'essentiel de l'ADN ?","Le noyau","La membrane","Le cytoplasme","La mitochondrie"],
+ ["Quelle est la vitesse approximative du son dans l'air ?","340 m/s","3 400 m/s","34 m/s","1 000 m/s"],
+ ["Quel est l'élément chimique le plus léger ?","L'hydrogène","L'hélium","Le lithium","Le carbone"]]},
+spo:{e:[
+ ["Avec quel objet joue-t-on au tennis ?","Une raquette","Une batte","Une crosse","Un club"],
+ ["Quel sport pratique-t-on dans une piscine, en compétition ?","La natation","L'aviron","Le surf","La voile"],
+ ["De quelle couleur est une balle de tennis moderne ?","Jaune fluo","Rouge","Bleue","Blanche uniquement"],
+ ["Dans quel sport marque-t-on un « but » avec un ballon rond ?","Le football","Le tennis","Le golf","Le volley"],
+ ["Quel animal monte-t-on en équitation ?","Le cheval","Le chameau","L'âne","Le taureau"]],
+ h:[
+ ["Quel pays a remporté la Coupe du monde de football 2022 ?","L'Argentine","La France","Le Brésil","La Croatie"],
+ ["Combien de joueurs une équipe de water-polo aligne-t-elle dans l'eau ?","Sept","Six","Cinq","Huit"],
+ ["Quel boxeur se surnommait lui-même « The Greatest » ?","Mohamed Ali","Mike Tyson","Joe Frazier","George Foreman"],
+ ["Quel pays a accueilli la Coupe du monde de football 1998 ?","La France","L'Italie","L'Espagne","L'Allemagne"],
+ ["Pour quel trophée les équipes de la LNH s'affrontent-elles ?","La Coupe Stanley","La Coupe Davis","La Coupe Ryder","La Coupe du Monde"],
+ ["Dans quel sport entend-on le terme « ace » sur un service gagnant ?","Le tennis","Le football","Le rugby","Le basket"],
+ ["Combien de minutes de jeu compte un match de basket NBA ?","48","40","60","36"],
+ ["Quel maillot récompense le meilleur grimpeur sur le Tour de France ?","Le maillot à pois","Le maillot vert","Le maillot blanc","Le maillot jaune"],
+ ["Quel pilote a égalé le record de sept titres mondiaux de Formule 1 de Michael Schumacher ?","Lewis Hamilton","Sebastian Vettel","Fernando Alonso","Max Verstappen"],
+ ["Dans quel sport décerne-t-on le « Ballon d'or » ?","Le football","Le basket","Le handball","Le rugby"]]}
+};
+Object.keys(MORE3).forEach(k=>{BANK[k].e.push(...MORE3[k].e);BANK[k].h.push(...MORE3[k].h)});
+
 /* ============================================================
    ÉTAT
    ============================================================ */
@@ -569,7 +676,7 @@ function reachable(from,steps){
   return [...res];
 }
 
-const newGame=(c,host)=>({code:c,host,status:'lobby',level:'e',board:false,order:[],turn:0,phase:'roll',moveN:null,options:null,q:null,result:null,used:[],winner:null,createdAt:Date.now()});
+const newGame=(c,host)=>({code:c,host,status:'lobby',board:false,order:[],turn:0,phase:'roll',moveN:null,options:null,q:null,result:null,used:[],winner:null,createdAt:Date.now()});
 const newPlayer=(id,name,color)=>({id,name,color:color||null,wedges:[],ok:0,ko:0,pos:'H',joinedAt:Date.now()});
 const pickColor=used=>TOKCOL.find(c=>!used.includes(c))||TOKCOL[rnd(TOKCOL.length)];
 const tokColor=(id,idx)=>(players[id]&&players[id].color)||TOKCOL[idx%TOKCOL.length];
@@ -634,7 +741,8 @@ async function chooseMove(node){
 }
 
 async function startQuestion(catId,wedge,final){
-  const hard=(game.level||'e')==='h';
+  // QG (camembert) et finale toujours difficiles ; sinon 70% difficile / 30% simple
+  const hard=wedge||final||Math.random()<0.70;
   const {key,used}=drawQuestion(catId,hard);
   const q={cat:catId,key,wedge:wedge&&!final,final,hard,opts:shuffle([0,1,2,3]),t0:Date.now()};
   await saveGame({phase:'question',q,used,result:null,moveN:null,options:null});
@@ -857,14 +965,8 @@ function colorPicker(){
   return `<div class="card"><p style="margin:0 0 8px"><b>Ta couleur de pion</b></p><div class="swatches">${TOKCOL.map(col=>`<button class="sw ${mine===col?'sel':''}" data-act="color" data-col="${col}" style="background:${col}" aria-label="couleur"></button>`).join('')}</div></div>`;
 }
 
-const levelName=l=>l==='h'?'Difficile':'Facile';
 function levelPicker(){
-  const lv=game.level||'e';
-  if(!isHost())return `<div class="card center"><span class="muted">Niveau de la partie</span><br><b>${levelName(lv)}</b></div>`;
-  return `<div class="card"><p style="margin:0 0 6px"><b>Niveau des questions</b></p><div class="row">
-    <button class="btn ${lv==='e'?'':'alt'}" data-act="level" data-lv="e" style="margin:0">Facile</button>
-    <button class="btn ${lv==='h'?'':'alt'}" data-act="level" data-lv="h" style="margin:0">Difficile</button></div>
-    <p class="muted" style="margin:8px 0 0;font-size:.88rem">${lv==='h'?'Questions pointues, pour les plus calés.':'Culture générale accessible à tous.'}</p></div>`;
+  return `<div class="card center"><p style="margin:0;font-size:.92rem" class="muted">🎯 Questions mélangées automatiquement : <b>70 % corsées, 30 % accessibles</b>. Les QG et la finale posent toujours une question difficile.</p></div>`;
 }
 function viewLobbyScreen(){
   const n=Object.keys(players).length;
@@ -1013,7 +1115,7 @@ function viewQuestion(ap){
   const correctIdx=q.opts.indexOf(0);
   const isRes=game.phase==='result';
   const mine=isMyTurn();
-  const sub=(q.final?'Question finale':(q.wedge?'Question camembert':''))||levelName(game.level||'e');
+  const sub=q.final?'Question finale':(q.wedge?'Question camembert':(q.hard?'Corsée':''));
   let opts=texts.map((t,i)=>{
     let cls='';
     if(isRes){cls=i===correctIdx?'ok':(game.result.choice===i?'ko':'dim')}
@@ -1088,7 +1190,6 @@ document.addEventListener('click',e=>{
   else if(a==='resume')resume();
   else if(a==='local')startLocal();
   else if(a==='addlocal')addLocalPlayer($('#addname').value);
-  else if(a==='level'){if(isHost())saveGame({level:b.dataset.lv})}
   else if(a==='color'){if(players[me.id])savePlayer(me.id,{color:b.dataset.col}).then(render)}
   else if(a==='lcolor')cycleLocalColor(b.dataset.id);
   else if(a==='start')startGame();
