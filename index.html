@@ -974,6 +974,7 @@ function render(){
   document.body.classList.toggle('focus',screen==='game'&&!!game&&game.status==='playing'&&game.phase!=='roll');
   syncTimer();
   lastSig=stateSig();
+  if(screen==='home'&&typeof applySWUpdate==='function')applySWUpdate();
 }
 
 function noticeHtml(){
@@ -1294,12 +1295,14 @@ const isStandalone=()=>{try{return (window.matchMedia&&window.matchMedia('(displ
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent||'');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if(screen==='home')render()});
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;toast('Application installée 🎉');if(screen==='home')render()});
+let swUpdatePending=false,swReloaded=false;
+/* On applique une mise à jour de l'app UNIQUEMENT sur l'accueil, jamais en pleine partie. */
+function applySWUpdate(){ if(swUpdatePending&&!swReloaded&&screen==='home'){swReloaded=true;location.reload()} }
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{
   const first=!navigator.serviceWorker.controller;   // première installation ?
   navigator.serviceWorker.register('sw.js').then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000)}).catch(()=>{});
-  let reloaded=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(reloaded||first)return;reloaded=true;location.reload();   // nouvelle version prête -> recharge
+    if(first)return;swUpdatePending=true;applySWUpdate();
   });
 })}
 
