@@ -858,7 +858,7 @@ function subscribe(c){
   unsubs.push(dbh.collection(`games/${c}/players`).onSnapshot(s=>{
     const next={};colDocs(s).forEach(p=>{if(p&&p.id)next[p.id]=p});players=next;render()}));
   if(pollIv)clearInterval(pollIv);
-  pollIv=setInterval(refreshOnce,3000);
+  pollIv=setInterval(refreshOnce,2000);
   store('gc_last',JSON.stringify({code:c,screen:screenFlag}));
 }
 function stateSig(){
@@ -867,9 +867,21 @@ function stateSig(){
     game.result&&game.result.choice,game.winner,
     Object.keys(players).sort().map(id=>[id,(players[id].wedges||[]).length,players[id].ok,players[id].ko])]);
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshOnce()});
-window.addEventListener('focus',refreshOnce);
-window.addEventListener('online',refreshOnce);
+/* Ré-abonnement temps réel : sur mobile (surtout en app installée), le canal
+   live Firebase se coupe en arrière-plan. Au réveil on relance les écouteurs,
+   pas seulement une lecture ponctuelle, pour que les mises à jour redeviennent directes. */
+function resync(){
+  if(mode!=='online'||!dbh||!code)return;
+  unsubs.forEach(u=>{try{typeof u==='function'&&u()}catch(e){}});unsubs=[];
+  unsubs.push(dbh.doc('games/'+code).onSnapshot(s=>{game=docData(s);render()}));
+  unsubs.push(dbh.collection(`games/${code}/players`).onSnapshot(s=>{
+    const next={};colDocs(s).forEach(p=>{if(p&&p.id)next[p.id]=p});players=next;render()}));
+  refreshOnce();
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)resync()});
+window.addEventListener('focus',resync);
+window.addEventListener('online',resync);
+window.addEventListener('pageshow',e=>{if(e.persisted)resync()});
 
 async function createOnline(name){
   if(!dbh||!me.id)return fail('Le mode en ligne n\'est pas disponible ici (connexion requise).');
@@ -1282,7 +1294,14 @@ const isStandalone=()=>{try{return (window.matchMedia&&window.matchMedia('(displ
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent||'');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if(screen==='home')render()});
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;toast('Application installée 🎉');if(screen==='home')render()});
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{
+  const first=!navigator.serviceWorker.controller;   // première installation ?
+  navigator.serviceWorker.register('sw.js').then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000)}).catch(()=>{});
+  let reloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(reloaded||first)return;reloaded=true;location.reload();   // nouvelle version prête -> recharge
+  });
+})}
 
 /* retrait de l'écran de lancement une fois l'animation terminée */
 (function(){const sp=document.getElementById('splash');if(!sp)return;

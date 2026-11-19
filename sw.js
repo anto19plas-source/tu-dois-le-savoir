@@ -1,7 +1,7 @@
 /* Service worker — Tu dois le savoir !?
    Met l'app en cache pour un lancement rapide et un fonctionnement hors ligne.
    Les appels Firebase/gstatic (autres domaines) ne sont jamais interceptés. */
-const CACHE='tdls-v1';
+const CACHE='tdls-v2';
 const ASSETS=['./','./index.html','./manifest.webmanifest',
   './icons/icon-192.png','./icons/icon-512.png','./icons/maskable-512.png','./icons/apple-touch-icon.png','./icons/favicon-64.png'];
 
