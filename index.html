@@ -143,6 +143,8 @@ body.screen .screengame .board{flex-wrap:wrap;justify-content:flex-start}
 .lchip .ldot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
 body.screen .legendbar{gap:10px;margin-bottom:14px}
 body.screen .lchip{font-size:1rem;padding:7px 15px}
+.ver{text-align:center;font-size:.72rem;color:var(--muted);margin:14px 0 0;opacity:.7}
+.ver a{color:var(--muted)}
 /* écran de lancement (splash) */
 #splash{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;
   background:radial-gradient(130% 130% at 50% 0%,var(--accent2),var(--accent) 55%,#2d2a63);
@@ -658,6 +660,7 @@ Object.keys(MORE3).forEach(k=>{BANK[k].e.push(...MORE3[k].e);BANK[k].h.push(...M
 const QTIME=30;            // secondes pour répondre
 const WEDGES_TO_WIN=CATS.length;
 const MAXP=8;              // joueurs maximum
+const VERSION='v5-2026-11-19';  // repère de version (doit être identique sur tous les appareils)
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rnd=n=>Math.floor(Math.random()*n);
@@ -1009,7 +1012,8 @@ function viewHome(){
     <p class="muted center" style="font-size:.9rem;margin:2px 0 0">On se passe le téléphone, chacun son tour.</p>
   </div>
   ${installHtml()}
-  ${legend()}`;
+  ${legend()}
+  <p class="ver">${VERSION}</p>`;
   return h;
 }
 
@@ -1050,7 +1054,8 @@ function viewLobbyScreen(){
   </div>
   ${levelPicker()}
   <button class="btn" data-act="start" ${n<2?'disabled':''}>Lancer la partie</button>${n<2?'<p class="center muted">Il faut au moins 2 joueurs.</p>':''}
-  <button class="btn alt" data-act="leave">Quitter</button>`;
+  <button class="btn alt" data-act="leave">Quitter</button>
+  <p class="ver">${VERSION} · <a href="#" data-act="reload">↻ Mettre à jour</a></p>`;
 }
 function viewLobby(){
   if(screenFlag&&mode==='online')return viewLobbyScreen();
@@ -1065,7 +1070,8 @@ function viewLobby(){
     ${colorPicker()}
     ${levelPicker()}
     ${isHost()?`<button class="btn" data-act="start" ${n<2?'disabled':''}>Lancer la partie</button>${n<2?'<p class="center muted">Il faut au moins 2 joueurs.</p>':''}`:`<p class="center muted">${game.board?'En attente du lancement sur l\'écran de jeu…':`En attente du lancement par ${esc(nm(game.host))}…`}</p>`}
-    <button class="btn alt" data-act="leave">Quitter</button>`;
+    <button class="btn alt" data-act="leave">Quitter</button>
+    <p class="ver">${VERSION} · <a href="#" data-act="reload">↻ Mettre à jour</a></p>`;
   }else{
     h=`<h1 class="center" style="margin-top:14px">Qui joue ?</h1>
     <div class="card"><h2 style="margin-top:0">Joueurs (${n})</h2>${playerList()}
@@ -1267,6 +1273,7 @@ document.addEventListener('click',e=>{
   else if(a==='skip')skipPlayer();
   else if(a==='rematch')rematch();
   else if(a==='install'){if(deferredPrompt){const p=deferredPrompt;deferredPrompt=null;p.prompt();if(p.userChoice)p.userChoice.finally(()=>render());render()}}
+  else if(a==='reload'){e.preventDefault();try{if('serviceWorker' in navigator)navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.update())).catch(()=>{})}catch(_){}location.reload()}
   else if(a==='leave')leave();
   else if(a==='copy'){try{navigator.clipboard.writeText(code).then(()=>toast('Code copié'),()=>toast('Code : '+code))}catch(err){toast('Code : '+code)}}
 });
