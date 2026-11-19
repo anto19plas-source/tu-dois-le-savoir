@@ -126,8 +126,14 @@ body.screen .screengame .board{flex-wrap:wrap;justify-content:flex-start}
 .pdot{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid #15151f;vertical-align:-2px;margin-right:2px;flex:0 0 auto}
 .pdot.clik{cursor:pointer}
 .cell-hit{cursor:pointer}
-.opt-badge{animation:pop .3s ease-out}
-.plateau svg .cell-hit:active{opacity:.15}
+.plateau svg .cell-hit:active{fill:var(--accent);opacity:.2}
+.opt-glow{animation:glow 1.1s ease-in-out infinite}
+@keyframes glow{0%,100%{opacity:.22}50%{opacity:.6}}
+.legendbar{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:6px 0 12px}
+.lchip{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:5px 11px;box-shadow:var(--shadow-sm)}
+.lchip .ldot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+body.screen .legendbar{gap:10px;margin-bottom:14px}
+body.screen .lchip{font-size:1rem;padding:7px 15px}
 .screenlobby{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin-top:12px}
 @media (max-width:800px){.screenlobby{grid-template-columns:1fr}}
 </style>
@@ -1007,8 +1013,8 @@ function viewLobby(){
 }
 
 function board(){
-  return `<div class="board">${game.order.map((id,idx)=>{const p=players[id];if(!p)return '';
-    return `<div class="pl ${id===activeId()?'active':''} ${id===me.id&&mode==='online'?'me':''}">${pie(p.wedges||[],52)}<div class="nm">${dot(id,idx,false)}${esc(p.name)}</div><div class="sc">${p.ok||0} ✓ · ${p.ko||0} ✗</div></div>`}).join('')}</div>`;
+  return `<div class="board">${game.order.map((id,idx)=>{const p=players[id];if(!p)return '';const nb=(p.wedges||[]).length;
+    return `<div class="pl ${id===activeId()?'active':''} ${id===me.id&&mode==='online'?'me':''}">${pie(p.wedges||[],52)}<div class="nm">${dot(id,idx,false)}${esc(p.name)}</div><div class="sc">🧀 ${nb}/${WEDGES_TO_WIN}</div></div>`}).join('')}</div>`;
 }
 
 /* couleurs des pions (distinctes des couleurs de catégories) */
@@ -1020,37 +1026,38 @@ function moveOptions(){
   const seen={};return game.options.filter(id=>{if(seen[id])return false;seen[id]=1;return true});
 }
 
-/* Plateau Trivial Pursuit : anneau de cases, 6 rayons, centre. */
+/* rappel des couleurs/catégories, intégré en haut */
+function catLegend(){
+  return `<div class="legendbar">${CATS.map(c=>`<span class="lchip"><span class="ldot" style="background:${c.color}"></span>${c.icon} ${c.name}</span>`).join('')}</div>`;
+}
+
+/* Plateau façon Trivial Pursuit : cases carrées, 6 rayons, centre. */
 function boardPlateau(){
   const N=BOARD.nodes,A=BOARD.adj,aid=activeId();
-  const optList=moveOptions(), optNum={};optList.forEach((id,i)=>optNum[id]=i+1);
-  const pickable=optList.length>0&&isMyTurn();
-  // camemberts déjà gagnés par le joueur qui regarde (son téléphone), sinon par le joueur actif (écran de jeu)
+  const optSet=new Set(moveOptions());
+  const pickable=optSet.size>0&&isMyTurn();
   const viewer=(players[me.id]||players[aid]||{}), ownW=viewer.wedges||[];
+  const rsq=(x,y,s,attrs)=>`<rect x="${(x-s/2).toFixed(1)}" y="${(y-s/2).toFixed(1)}" width="${s}" height="${s}" rx="${(s*0.26).toFixed(1)}" ${attrs}/>`;
+  const glow=(x,y,s)=>rsq(x,y,s+18,'fill="var(--accent)" class="opt-glow"')+rsq(x,y,s+8,'fill="none" stroke="var(--accent)" stroke-width="4.5"');
   // liens
   const seen={};let lines='';
   Object.keys(A).forEach(id=>A[id].forEach(j=>{const k=id<j?id+'|'+j:j+'|'+id;if(seen[k])return;seen[k]=1;
-    lines+=`<line x1="${N[id].x.toFixed(1)}" y1="${N[id].y.toFixed(1)}" x2="${N[j].x.toFixed(1)}" y2="${N[j].y.toFixed(1)}" stroke="#cdbf9f" stroke-width="6" stroke-linecap="round" opacity=".55"/>`;}));
+    lines+=`<line x1="${N[id].x.toFixed(1)}" y1="${N[id].y.toFixed(1)}" x2="${N[j].x.toFixed(1)}" y2="${N[j].y.toFixed(1)}" stroke="#cdbf9f" stroke-width="6" stroke-linecap="round" opacity=".5"/>`;}));
   // cases
-  let cells='',badges='',hits='';
-  Object.keys(N).forEach(id=>{const nd=N[id],hot=optNum[id];
+  let cells='',hits='';
+  Object.keys(N).forEach(id=>{const nd=N[id],hot=optSet.has(id);
     if(nd.type==='hub'){
-      if(hot)cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="47" fill="none" stroke="var(--accent)" stroke-width="4" stroke-dasharray="5 6" class="opt-ring"/>`;
-      cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="40" fill="var(--ink)" stroke="#fff" stroke-width="3"/><text x="${nd.x}" y="${nd.y}" font-size="12" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">CENTRE</text>`;
+      const s=72;
+      if(hot)cells+=glow(nd.x,nd.y,s);
+      cells+=rsq(nd.x,nd.y,s,'fill="var(--ink)" stroke="#fff" stroke-width="3"')+`<text x="${nd.x}" y="${nd.y}" font-size="13" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">CENTRE</text>`;
     }else{
-      const c=catById(nd.cat),r=nd.type==='hq'?21:13,got=nd.type==='hq'&&ownW.includes(nd.cat);
-      if(hot)cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r+8}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-dasharray="5 6" class="opt-ring"/>`;
-      cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="${got?'#b9b9c6':c.color}" stroke="#fff" stroke-width="${nd.type==='hq'?3:2}"${got?' opacity="0.7"':''}/>`;
-      if(nd.type==='hq')cells+=`<text x="${nd.x}" y="${nd.y}" font-size="20" text-anchor="middle" dominant-baseline="central"${got?' opacity="0.5"':''}>${c.icon}</text>`;
-      if(got)cells+=`<text x="${(nd.x+14).toFixed(1)}" y="${(nd.y-13).toFixed(1)}" font-size="15" text-anchor="middle" dominant-baseline="central">✓</text>`;
+      const c=catById(nd.cat),s=nd.type==='hq'?46:28,got=nd.type==='hq'&&ownW.includes(nd.cat);
+      if(hot)cells+=glow(nd.x,nd.y,s);
+      cells+=rsq(nd.x,nd.y,s,`fill="${got?'#b9b9c6':c.color}" stroke="#fff" stroke-width="${nd.type==='hq'?3:2}"${got?' opacity="0.7"':''}`);
+      if(nd.type==='hq')cells+=`<text x="${nd.x}" y="${nd.y}" font-size="22" text-anchor="middle" dominant-baseline="central"${got?' opacity="0.5"':''}>${c.icon}</text>`;
+      if(got)cells+=`<text x="${(nd.x+16).toFixed(1)}" y="${(nd.y-15).toFixed(1)}" font-size="16" text-anchor="middle" dominant-baseline="central">✓</text>`;
     }
-    if(hot){
-      // badge numéro pour relier à la liste
-      const bx=nd.x,by=nd.y-(nd.type==='hub'?54:nd.type==='hq'?33:25);
-      badges+=`<g class="opt-badge"><circle cx="${bx}" cy="${by}" r="11" fill="var(--accent)" stroke="#fff" stroke-width="2"/><text x="${bx}" y="${by}" font-size="12" font-weight="800" fill="#fff" text-anchor="middle" dominant-baseline="central">${hot}</text></g>`;
-      // zone cliquable (seulement pour le joueur dont c'est le tour)
-      if(pickable)hits+=`<circle cx="${nd.x}" cy="${nd.y}" r="26" fill="transparent" class="cell-hit" data-act="move" data-node="${id}"/>`;
-    }
+    if(hot&&pickable){const s=(nd.type==='hub'?72:nd.type==='hq'?46:28)+18;hits+=rsq(nd.x,nd.y,s,`fill="transparent" class="cell-hit" data-act="move" data-node="${id}"`);}
   });
   // pions, groupés par case
   const groups={};game.order.forEach((id,idx)=>{const p=players[id];if(!p)return;const pos=p.pos||'H';(groups[pos]=groups[pos]||[]).push({id,idx})});
@@ -1064,7 +1071,7 @@ function boardPlateau(){
       labels+=`<g transform="translate(${x.toFixed(1)} ${ly.toFixed(1)})"><rect x="${(-bw/2).toFixed(1)}" y="-9" width="${bw.toFixed(1)}" height="18" rx="9" fill="${col}" stroke="#15151f" stroke-width="1.5"/><text y="1" font-size="10.5" font-weight="700" fill="#15151f" text-anchor="middle" dominant-baseline="central">${nmL}</text></g>`;
     });
   });
-  return `<div class="plateau"><svg viewBox="0 0 470 470">${lines}${cells}${toks}${labels}${badges}${hits}</svg></div>`;
+  return `<div class="plateau"><svg viewBox="0 0 470 470">${lines}${cells}${toks}${labels}${hits}</svg></div>`;
 }
 
 function viewGame(){
@@ -1075,8 +1082,9 @@ function viewGame(){
   else if(game.phase==='move')main=viewMove(ap);
   else main=viewQuestion(ap);
   const foot=`<div class="row" style="margin-top:18px">${isHost()&&mode==='online'?`<button class="btn small alt" data-act="skip">Passer ${esc(ap.name)}</button>`:'<span></span>'}<button class="btn small alt" data-act="leave" style="margin-left:auto;flex:0 0 auto">Quitter</button></div>`;
-  if(screenFlag&&mode==='online')return `<div class="screengame">${boardPlateau()}<div class="screencol">${board()}${main}</div></div>${foot}`;
-  return boardPlateau()+board()+main+foot;
+  const leg=catLegend();
+  if(screenFlag&&mode==='online')return `${leg}<div class="screengame">${boardPlateau()}<div class="screencol">${board()}${main}</div></div>${foot}`;
+  return leg+boardPlateau()+board()+main+foot;
 }
 
 function dieFace(n){return `<div class="die">${'⚀⚁⚂⚃⚄⚅'[(n||1)-1]||'🎲'}</div>`}
@@ -1096,16 +1104,9 @@ function viewRoll(ap){
 
 function viewMove(ap){
   const mine=isMyTurn();
-  const list=moveOptions().map((id,i)=>{
-    const nd=BOARD.nodes[id],num=i+1;
-    if(nd.type==='hub')return {id,num,label:'🏁 CENTRE'+(hasAll(ap)?' — Finale !':' — relance'),tag:'',color:'var(--ink)'};
-    const c=catById(nd.cat);
-    return {id,num,label:`${c.icon} ${c.name}`,tag:nd.type==='hq'?'QG · camembert':'',color:c.color};
-  });
-  const btns=list.map(o=>`<button class="opt move" data-act="move" data-node="${o.id}" ${mine?'':'disabled'}><span class="l" style="background:${o.color}">${o.num}</span><span>${o.label}${o.tag?` <small class="muted">(${o.tag})</small>`:''}</span></button>`).join('');
-  return `<div class="card" style="margin-top:6px">
-    <div class="center"><p class="muted" style="margin:0">${esc(ap.name)} a fait</p>${dieFace(game.moveN)}<p class="muted" style="margin:0 0 4px">${mine?'Touche une case clignotante sur le plateau, ou choisis ci-dessous':'Choisit sa case…'}</p></div>
-    ${mine?btns:''}
+  return `<div class="card center" style="margin-top:6px">
+    <p class="muted" style="margin:0">${esc(ap.name)} a fait</p>${dieFace(game.moveN)}
+    <p style="margin:6px 0 0">${mine?'👉 Touche une case <b>en surbrillance</b> sur le plateau':`${esc(ap.name)} choisit sa case…`}</p>
   </div>`;
 }
 
@@ -1148,7 +1149,7 @@ function viewFinished(){
   const ids=Object.keys(players).sort((a,b)=>(players[b].wedges||[]).length-(players[a].wedges||[]).length||(players[b].ok||0)-(players[a].ok||0));
   return `<div class="winner">🏆</div>
   <h1 class="center">${esc(w?w.name:'Quelqu\'un')} remporte la partie !</h1>
-  <div class="card"><ul class="plist">${ids.map(id=>{const p=players[id];return `<li>${pie(p.wedges||[],34)}<b>${esc(p.name)}</b><span class="muted" style="margin-left:auto">${p.ok||0} bonnes · ${p.ko||0} ratées</span></li>`}).join('')}</ul></div>
+  <div class="card"><ul class="plist">${ids.map(id=>{const p=players[id];return `<li>${pie(p.wedges||[],34)}<b>${esc(p.name)}</b><span class="muted" style="margin-left:auto">🧀 ${(p.wedges||[]).length}/${WEDGES_TO_WIN}</span></li>`}).join('')}</ul></div>
   ${isHost()?`<button class="btn" data-act="rematch">Nouvelle partie</button>`:`<p class="center muted">${game.board?'En attente d\'une revanche lancée depuis l\'écran de jeu…':`En attente d'une revanche proposée par ${esc(nm(game.host))}…`}</p>`}
   <button class="btn alt" data-act="leave">Quitter</button>`;
 }
