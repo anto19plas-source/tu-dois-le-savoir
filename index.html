@@ -124,6 +124,9 @@ body.screen .screengame .board{flex-wrap:wrap;justify-content:flex-start}
 .sw.sel{border-color:var(--ink);box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--ink)}
 .pdot{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid #15151f;vertical-align:-2px;margin-right:2px;flex:0 0 auto}
 .pdot.clik{cursor:pointer}
+.cell-hit{cursor:pointer}
+.opt-badge{animation:pop .3s ease-out}
+.plateau svg .cell-hit:active{opacity:.15}
 .screenlobby{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin-top:12px}
 @media (max-width:800px){.screenlobby{grid-template-columns:1fr}}
 </style>
@@ -537,7 +540,7 @@ function colDocs(s){
    ============================================================ */
 /* ---------- Plateau facon Trivial Pursuit : anneau + 6 rayons + centre ---------- */
 const BOARD=(function(){
-  const cx=230,cy=230,Rr=205,Ra=120,Rb=62;
+  const cx=235,cy=235,Rr=205,Ra=150,Rb=96;
   const nodes={},adj={};
   const link=(x,y)=>{(adj[x]=adj[x]||[]).push(y);(adj[y]=adj[y]||[]).push(x)};
   for(let p=0;p<36;p++){
@@ -908,38 +911,54 @@ function board(){
 /* couleurs des pions (distinctes des couleurs de catégories) */
 const TOKCOL=['#ff5964','#ffffff','#00d4ff','#c8ff00','#ff9ff3','#ffb703','#a0e548','#ff7ad9'];
 
+/* liste ordonnée et dédupliquée des cases choisissables (dé lancé) */
+function moveOptions(){
+  if(game.phase!=='move'||!game.options)return [];
+  const seen={};return game.options.filter(id=>{if(seen[id])return false;seen[id]=1;return true});
+}
+
 /* Plateau Trivial Pursuit : anneau de cases, 6 rayons, centre. */
 function boardPlateau(){
   const N=BOARD.nodes,A=BOARD.adj,aid=activeId();
-  const opts=(game.phase==='move'&&game.options)?game.options:[];
+  const optList=moveOptions(), optNum={};optList.forEach((id,i)=>optNum[id]=i+1);
+  const pickable=optList.length>0&&isMyTurn();
   // liens
   const seen={};let lines='';
   Object.keys(A).forEach(id=>A[id].forEach(j=>{const k=id<j?id+'|'+j:j+'|'+id;if(seen[k])return;seen[k]=1;
-    lines+=`<line x1="${N[id].x.toFixed(1)}" y1="${N[id].y.toFixed(1)}" x2="${N[j].x.toFixed(1)}" y2="${N[j].y.toFixed(1)}" stroke="#cdbf9f" stroke-width="5" stroke-linecap="round"/>`;}));
+    lines+=`<line x1="${N[id].x.toFixed(1)}" y1="${N[id].y.toFixed(1)}" x2="${N[j].x.toFixed(1)}" y2="${N[j].y.toFixed(1)}" stroke="#cdbf9f" stroke-width="6" stroke-linecap="round" opacity=".55"/>`;}));
   // cases
-  let cells='';
-  Object.keys(N).forEach(id=>{const nd=N[id];
-    if(nd.type==='hub'){if(opts.includes(id))cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="51" fill="none" stroke="var(--ink)" stroke-width="3" stroke-dasharray="4 5" class="opt-ring"/>`;cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="44" fill="var(--ink)" stroke="#fff" stroke-width="3"/><text x="${nd.x}" y="${nd.y}" font-size="12" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">CENTRE</text>`;return}
-    const c=catById(nd.cat),r=nd.type==='hq'?19:12,hot=opts.includes(id);
-    if(hot)cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r+7}" fill="none" stroke="var(--ink)" stroke-width="3" stroke-dasharray="4 5" class="opt-ring"/>`;
-    cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="${c.color}" stroke="#fff" stroke-width="${nd.type==='hq'?3:2}"/>`;
-    if(nd.type==='hq')cells+=`<text x="${nd.x}" y="${nd.y}" font-size="18" text-anchor="middle" dominant-baseline="central">${c.icon}</text>`;
+  let cells='',badges='',hits='';
+  Object.keys(N).forEach(id=>{const nd=N[id],hot=optNum[id];
+    if(nd.type==='hub'){
+      if(hot)cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="47" fill="none" stroke="var(--accent)" stroke-width="4" stroke-dasharray="5 6" class="opt-ring"/>`;
+      cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="40" fill="var(--ink)" stroke="#fff" stroke-width="3"/><text x="${nd.x}" y="${nd.y}" font-size="12" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">CENTRE</text>`;
+    }else{
+      const c=catById(nd.cat),r=nd.type==='hq'?21:13;
+      if(hot)cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r+8}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-dasharray="5 6" class="opt-ring"/>`;
+      cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="${c.color}" stroke="#fff" stroke-width="${nd.type==='hq'?3:2}"/>`;
+      if(nd.type==='hq')cells+=`<text x="${nd.x}" y="${nd.y}" font-size="20" text-anchor="middle" dominant-baseline="central">${c.icon}</text>`;
+    }
+    if(hot){
+      // badge numéro pour relier à la liste
+      const bx=nd.x,by=nd.y-(nd.type==='hub'?54:nd.type==='hq'?33:25);
+      badges+=`<g class="opt-badge"><circle cx="${bx}" cy="${by}" r="11" fill="var(--accent)" stroke="#fff" stroke-width="2"/><text x="${bx}" y="${by}" font-size="12" font-weight="800" fill="#fff" text-anchor="middle" dominant-baseline="central">${hot}</text></g>`;
+      // zone cliquable (seulement pour le joueur dont c'est le tour)
+      if(pickable)hits+=`<circle cx="${nd.x}" cy="${nd.y}" r="26" fill="transparent" class="cell-hit" data-act="move" data-node="${id}"/>`;
+    }
   });
   // pions, groupés par case
   const groups={};game.order.forEach((id,idx)=>{const p=players[id];if(!p)return;const pos=p.pos||'H';(groups[pos]=groups[pos]||[]).push({id,idx})});
-  let toks='';
-  let labels='';
+  let toks='',labels='';
   Object.keys(groups).forEach(pos=>{const arr=groups[pos],base=N[pos]||N['H'];
-    arr.forEach((o,k)=>{const an=k/arr.length*2*Math.PI,off=arr.length>1?15:0;
+    arr.forEach((o,k)=>{const an=k/Math.max(1,arr.length)*2*Math.PI,off=arr.length>1?16:0;
       const x=base.x+off*Math.cos(an),y=base.y+off*Math.sin(an);
       const col=tokColor(o.id,o.idx),act=o.id===aid,ini=esc((players[o.id].name||'?').slice(0,2).toUpperCase());
-      toks+=`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">${act?'<circle r="17" fill="none" stroke="var(--ink)" stroke-width="3"/>':''}<circle r="12" fill="${col}" stroke="#15151f" stroke-width="2"/><text y="1" font-size="10" font-weight="800" fill="#15151f" text-anchor="middle" dominant-baseline="central">${ini}</text></g>`;
-      // étiquette avec le nom, au-dessus du pion
-      const nmL=esc((players[o.id].name||'').slice(0,11)),bw=nmL.length*6.3+12,ly=y-23-k*17;
-      labels+=`<g transform="translate(${x.toFixed(1)} ${ly.toFixed(1)})"><rect x="${(-bw/2).toFixed(1)}" y="-9" width="${bw.toFixed(1)}" height="17" rx="8" fill="${col}" stroke="#15151f" stroke-width="1.5"/><text y="1" font-size="10.5" font-weight="700" fill="#15151f" text-anchor="middle" dominant-baseline="central">${nmL}</text></g>`;
+      toks+=`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">${act?'<circle r="18" fill="none" stroke="var(--accent)" stroke-width="3"/>':''}<circle r="13" fill="${col}" stroke="#15151f" stroke-width="2"/><text y="1" font-size="10" font-weight="800" fill="#15151f" text-anchor="middle" dominant-baseline="central">${ini}</text></g>`;
+      const nmL=esc((players[o.id].name||'').slice(0,11)),bw=nmL.length*6.4+14,ly=y+26+k*18;
+      labels+=`<g transform="translate(${x.toFixed(1)} ${ly.toFixed(1)})"><rect x="${(-bw/2).toFixed(1)}" y="-9" width="${bw.toFixed(1)}" height="18" rx="9" fill="${col}" stroke="#15151f" stroke-width="1.5"/><text y="1" font-size="10.5" font-weight="700" fill="#15151f" text-anchor="middle" dominant-baseline="central">${nmL}</text></g>`;
     });
   });
-  return `<div class="plateau"><svg viewBox="0 0 460 460" aria-hidden="true">${lines}${cells}${toks}${labels}</svg></div>`;
+  return `<div class="plateau"><svg viewBox="0 0 470 470">${lines}${cells}${toks}${labels}${badges}${hits}</svg></div>`;
 }
 
 function viewGame(){
@@ -971,18 +990,16 @@ function viewRoll(ap){
 
 function viewMove(ap){
   const mine=isMyTurn();
-  const opts=game.options||[];
-  // regrouper les options par case pour un libellé clair
-  const seen={};const list=opts.filter(id=>{if(seen[id])return false;seen[id]=1;return true}).map(id=>{
-    const nd=BOARD.nodes[id];
-    if(nd.type==='hub')return {id,label:'🏁 CENTRE'+(hasAll(ap)?' — Finale !':' — relance'),tag:'centre'};
+  const list=moveOptions().map((id,i)=>{
+    const nd=BOARD.nodes[id],num=i+1;
+    if(nd.type==='hub')return {id,num,label:'🏁 CENTRE'+(hasAll(ap)?' — Finale !':' — relance'),tag:'',color:'var(--ink)'};
     const c=catById(nd.cat);
-    return {id,label:`${c.icon} ${c.name}`,tag:nd.type==='hq'?'QG — camembert':'',color:c.color};
+    return {id,num,label:`${c.icon} ${c.name}`,tag:nd.type==='hq'?'QG · camembert':'',color:c.color};
   });
-  const btns=list.map(o=>`<button class="opt move" data-act="move" data-node="${o.id}" ${mine?'':'disabled'}><span class="l" style="background:${o.color||'var(--ink)'}">→</span><span>${o.label}${o.tag?` <small class="muted">(${o.tag})</small>`:''}</span></button>`).join('');
+  const btns=list.map(o=>`<button class="opt move" data-act="move" data-node="${o.id}" ${mine?'':'disabled'}><span class="l" style="background:${o.color}">${o.num}</span><span>${o.label}${o.tag?` <small class="muted">(${o.tag})</small>`:''}</span></button>`).join('');
   return `<div class="card" style="margin-top:6px">
-    <div class="center"><p class="muted" style="margin:0">${esc(ap.name)} a fait</p>${dieFace(game.moveN)}<p class="muted" style="margin:0 0 4px">Choisis ta case</p></div>
-    ${mine?btns:`<p class="muted center">${esc(ap.name)} déplace son pion…</p>`}
+    <div class="center"><p class="muted" style="margin:0">${esc(ap.name)} a fait</p>${dieFace(game.moveN)}<p class="muted" style="margin:0 0 4px">${mine?'Touche une case clignotante sur le plateau, ou choisis ci-dessous':'Choisit sa case…'}</p></div>
+    ${mine?btns:''}
   </div>`;
 }
 
@@ -1011,8 +1028,13 @@ function viewQuestion(ap){
   }else{
     extra=mine?`<div class="timer"><i id="tbar"></i></div><p class="muted" style="margin:2px 0 0;font-size:.85rem"><span id="tleft">${QTIME} s</span></p>`:`<p class="muted center" style="margin-top:10px">${esc(ap.name)} réfléchit…</p>`;
   }
+  // sur un téléphone d'une partie à plateau : pas le texte de la question (il est sur l'écran), juste les réponses
+  const phoneCtrl=mode==='online'&&game.board&&!screenFlag;
+  const qtext=phoneCtrl
+    ?(isRes?'':`<p class="muted center" style="margin:2px 0 10px">👀 Lis la question sur l'écran, réponds ici</p>`)
+    :`<div class="qtext">${esc(item[0])}</div>`;
   return `<div style="margin-top:6px"><div class="qhead" style="background:${cat.color}"><span class="ic">${cat.icon}</span>${esc(cat.name)}${sub?`<span class="sub">${sub}</span>`:''}</div>
-  <div class="qbody"><div class="muted" style="font-size:.85rem;margin-bottom:2px">${esc(ap.name)}</div><div class="qtext">${esc(item[0])}</div><div class="opts">${opts}</div>${extra}</div></div>`;
+  <div class="qbody"><div class="muted" style="font-size:.85rem;margin-bottom:2px">${esc(ap.name)}</div>${qtext}<div class="opts">${opts}</div>${extra}</div></div>`;
 }
 
 function viewFinished(){
