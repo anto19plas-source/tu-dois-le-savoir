@@ -147,8 +147,10 @@ body.screen .lchip{font-size:1rem;padding:7px 15px}
 .ver a{color:var(--muted)}
 /* interface de réponse en surimpression sur téléphone (zoom-fondu, tout sur une page) */
 .qoverlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:14px;
-  background:rgba(18,18,36,.58);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:ofade .22s ease-out}
-.qsheet{width:100%;max-width:470px;max-height:90vh;overflow:auto;animation:ozoom .32s cubic-bezier(.2,1.25,.4,1)}
+  background:rgba(18,18,36,.58);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.qoverlay.anim{animation:ofade .22s ease-out}
+.qoverlay.anim .qsheet{animation:ozoom .34s cubic-bezier(.2,1.25,.4,1)}
+.qsheet{width:100%;max-width:470px;max-height:90vh;overflow:auto}
 .qsheet .qcard{margin:0}
 @keyframes ofade{from{opacity:0}to{opacity:1}}
 @keyframes ozoom{from{transform:scale(.86);opacity:0}to{transform:scale(1);opacity:1}}
@@ -667,7 +669,7 @@ Object.keys(MORE3).forEach(k=>{BANK[k].e.push(...MORE3[k].e);BANK[k].h.push(...M
 const QTIME=30;            // secondes pour répondre
 const WEDGES_TO_WIN=CATS.length;
 const MAXP=8;              // joueurs maximum
-const VERSION='v6-2026-11-19';  // repère de version (doit être identique sur tous les appareils)
+const VERSION='v7-2026-11-19';  // repère de version (doit être identique sur tous les appareils)
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rnd=n=>Math.floor(Math.random()*n);
@@ -682,6 +684,7 @@ let code=null, game=null, players={}, unsubs=[];
 let screen='home', notice='', noticeErr=false;
 let timerIv=null, timerKey=null;
 let rolling=null;            // {on:index} pendant l'animation du dé
+let animQ=null;             // t0 de la dernière question déjà animée (évite de rejouer l'anim)
 let busy=false;
 let capsReady=false;
 
@@ -1110,34 +1113,50 @@ function catLegend(){
   return `<div class="legendbar">${CATS.map(c=>`<span class="lchip"><span class="ldot" style="background:${c.color}"></span>${c.icon} ${c.name}</span>`).join('')}</div>`;
 }
 
-/* Plateau façon Trivial Pursuit : cases carrées, 6 rayons, centre. */
+/* Plateau façon Trivial Pursuit : anneau tangentiel, rayons en triangles, centre hexagonal coloré. */
 function boardPlateau(){
-  const N=BOARD.nodes,A=BOARD.adj,aid=activeId();
+  const N=BOARD.nodes,A=BOARD.adj,aid=activeId(),CX=BOARD.cx,CY=BOARD.cy;
   const optSet=new Set(moveOptions());
   const pickable=optSet.size>0&&isMyTurn();
   const viewer=(players[me.id]||players[aid]||{}), ownW=viewer.wedges||[];
-  const rsq=(x,y,s,attrs)=>`<rect x="${(x-s/2).toFixed(1)}" y="${(y-s/2).toFixed(1)}" width="${s}" height="${s}" rx="${(s*0.26).toFixed(1)}" ${attrs}/>`;
-  const glow=(x,y,s)=>rsq(x,y,s+18,'fill="var(--accent)" class="opt-glow"')+rsq(x,y,s+8,'fill="none" stroke="var(--accent)" stroke-width="4.5"');
-  // liens
+  const DARK='#1c1c30';
+  // rectangle orienté tangentiellement à l'anneau
+  const rrot=(x,y,w,h,deg,attrs)=>`<g transform="rotate(${deg.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"><rect x="${(x-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w}" height="${h}" rx="5" ${attrs}/></g>`;
+  // triangle pointant vers le centre (pour les rayons)
+  const tri=(x,y,a,sz,attrs)=>{const ox=Math.cos(a),oy=Math.sin(a),px=-Math.sin(a),py=Math.cos(a);
+    const tx=x-sz*1.05*ox,ty=y-sz*1.05*oy, b1x=x+sz*0.75*ox+sz*px,b1y=y+sz*0.75*oy+sz*py, b2x=x+sz*0.75*ox-sz*px,b2y=y+sz*0.75*oy-sz*py;
+    return `<path d="M${tx.toFixed(1)} ${ty.toFixed(1)} L${b1x.toFixed(1)} ${b1y.toFixed(1)} L${b2x.toFixed(1)} ${b2y.toFixed(1)} Z" ${attrs}/>`;};
+  // surbrillance claire (halo jaune vif + anneau)
+  const glow=(x,y,r)=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+9).toFixed(1)}" fill="#ffd21f" class="opt-glow"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+4).toFixed(1)}" fill="none" stroke="#ffc400" stroke-width="4.5"/>`;
+  // liens (structure)
   const seen={};let lines='';
   Object.keys(A).forEach(id=>A[id].forEach(j=>{const k=id<j?id+'|'+j:j+'|'+id;if(seen[k])return;seen[k]=1;
-    lines+=`<line x1="${N[id].x.toFixed(1)}" y1="${N[id].y.toFixed(1)}" x2="${N[j].x.toFixed(1)}" y2="${N[j].y.toFixed(1)}" stroke="#cdbf9f" stroke-width="6" stroke-linecap="round" opacity=".5"/>`;}));
+    lines+=`<line x1="${N[id].x.toFixed(1)}" y1="${N[id].y.toFixed(1)}" x2="${N[j].x.toFixed(1)}" y2="${N[j].y.toFixed(1)}" stroke="${DARK}" stroke-width="2" opacity=".28"/>`;}));
   // cases
-  let cells='',hits='';
-  Object.keys(N).forEach(id=>{const nd=N[id],hot=optSet.has(id);
-    if(nd.type==='hub'){
-      const s=72;
-      if(hot)cells+=glow(nd.x,nd.y,s);
-      cells+=rsq(nd.x,nd.y,s,'fill="var(--ink)" stroke="#fff" stroke-width="3"')+`<text x="${nd.x}" y="${nd.y}" font-size="13" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">CENTRE</text>`;
+  let glows='',cells='',hits='';
+  Object.keys(N).forEach(id=>{const nd=N[id];if(nd.type==='hub')return;
+    const a=Math.atan2(nd.y-CY,nd.x-CX),deg=a*180/Math.PI+90;
+    const c=catById(nd.cat),hot=optSet.has(id),got=nd.type==='hq'&&ownW.includes(nd.cat),fill=got?'#c3c3cf':c.color;
+    const r=nd.type==='hq'?30:(id[0]==='S'?20:24);
+    if(hot)glows+=glow(nd.x,nd.y,r);
+    if(id[0]==='S'){
+      cells+=tri(nd.x,nd.y,a,16,`fill="${fill}" stroke="${DARK}" stroke-width="2" stroke-linejoin="round"${got?' opacity="0.65"':''}`);
+    }else if(nd.type==='hq'){
+      cells+=rrot(nd.x,nd.y,48,42,deg,`fill="${fill}" stroke="${DARK}" stroke-width="2.6"${got?' opacity="0.65"':''}`);
+      cells+=`<text x="${nd.x}" y="${nd.y}" font-size="24" text-anchor="middle" dominant-baseline="central"${got?' opacity="0.5"':''}>${c.icon}</text>`;
+      if(got)cells+=`<text x="${(nd.x+18).toFixed(1)}" y="${(nd.y-18).toFixed(1)}" font-size="16" text-anchor="middle" dominant-baseline="central">✓</text>`;
     }else{
-      const c=catById(nd.cat),s=nd.type==='hq'?46:28,got=nd.type==='hq'&&ownW.includes(nd.cat);
-      if(hot)cells+=glow(nd.x,nd.y,s);
-      cells+=rsq(nd.x,nd.y,s,`fill="${got?'#b9b9c6':c.color}" stroke="#fff" stroke-width="${nd.type==='hq'?3:2}"${got?' opacity="0.7"':''}`);
-      if(nd.type==='hq')cells+=`<text x="${nd.x}" y="${nd.y}" font-size="22" text-anchor="middle" dominant-baseline="central"${got?' opacity="0.5"':''}>${c.icon}</text>`;
-      if(got)cells+=`<text x="${(nd.x+16).toFixed(1)}" y="${(nd.y-15).toFixed(1)}" font-size="16" text-anchor="middle" dominant-baseline="central">✓</text>`;
+      cells+=rrot(nd.x,nd.y,36,30,deg,`fill="${fill}" stroke="${DARK}" stroke-width="2"`);
     }
-    if(hot&&pickable){const s=(nd.type==='hub'?72:nd.type==='hq'?46:28)+18;hits+=rsq(nd.x,nd.y,s,`fill="transparent" class="cell-hit" data-act="move" data-node="${id}"`);}
+    if(hot&&pickable)hits+=`<circle cx="${nd.x.toFixed(1)}" cy="${nd.y.toFixed(1)}" r="${(r+6).toFixed(1)}" fill="transparent" class="cell-hit" data-act="move" data-node="${id}"/>`;
   });
+  // centre : hexagone à 6 quartiers colorés (mini camembert)
+  const HR=48,hv=i=>{const an=(-90+i*60)*Math.PI/180;return [CX+HR*Math.cos(an),CY+HR*Math.sin(an)]};
+  if(optSet.has('H'))glows+=glow(CX,CY,HR+2);
+  for(let i=0;i<6;i++){const [x1,y1]=hv(i),[x2,y2]=hv(i+1);cells+=`<path d="M${CX} ${CY} L${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${CATS[i].color}" stroke="#fff" stroke-width="1.5"/>`;}
+  cells+=`<polygon points="${[0,1,2,3,4,5].map(i=>{const[x,y]=hv(i);return x.toFixed(1)+','+y.toFixed(1)}).join(' ')}" fill="none" stroke="${DARK}" stroke-width="3"/>`;
+  if(optSet.has('H')&&pickable)hits+=`<circle cx="${CX}" cy="${CY}" r="${HR+6}" fill="transparent" class="cell-hit" data-act="move" data-node="H"/>`;
+  cells=glows+cells;
   // pions, groupés par case
   const groups={};game.order.forEach((id,idx)=>{const p=players[id];if(!p)return;const pos=p.pos||'H';(groups[pos]=groups[pos]||[]).push({id,idx})});
   let toks='',labels='';
@@ -1223,7 +1242,8 @@ function viewQuestion(ap){
   <div class="qbody"><div class="muted" style="font-size:.85rem;margin-bottom:2px">${esc(ap.name)}</div>${qtext}<div class="opts">${opts}</div>${extra}</div></div>`;
   // sur le grand écran de jeu : intégré à côté du plateau ; sur téléphone : carte centrée en zoom-fondu (pas besoin de défiler)
   if(screenFlag)return `<div style="margin-top:6px">${block}</div>`;
-  return `<div class="qoverlay"><div class="qsheet">${block}</div></div>`;
+  const fresh=animQ!==q.t0; animQ=q.t0;   // n'animer qu'à la première apparition de la question
+  return `<div class="qoverlay${fresh?' anim':''}"><div class="qsheet">${block}</div></div>`;
 }
 
 function viewFinished(){
