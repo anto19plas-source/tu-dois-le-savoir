@@ -112,6 +112,10 @@ body.screen .verdict{font-size:1.8rem}
 .plateau svg{width:100%;height:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.18))}
 .screencol{min-width:0}
 body.screen .screengame .board{flex-wrap:wrap;justify-content:flex-start}
+.die{font-size:4.2rem;line-height:1;margin:6px 0;animation:pop .25s ease-out}
+.opt.move .l{color:#fff;font-weight:800}
+.opt-ring{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
 .screenlobby{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin-top:12px}
 @media (max-width:800px){.screenlobby{grid-template-columns:1fr}}
 </style>
@@ -522,13 +526,44 @@ function colDocs(s){
 /* ============================================================
    LOGIQUE DE JEU
    ============================================================ */
-const newGame=(c,host)=>({code:c,host,status:'lobby',level:'e',board:false,order:[],turn:0,phase:'roll',q:null,result:null,used:[],winner:null,createdAt:Date.now()});
-const newPlayer=(id,name)=>({id,name,wedges:[],ok:0,ko:0,joinedAt:Date.now()});
+/* ---------- Plateau facon Trivial Pursuit : anneau + 6 rayons + centre ---------- */
+const BOARD=(function(){
+  const cx=230,cy=230,Rr=205,Ra=120,Rb=62;
+  const nodes={},adj={};
+  const link=(x,y)=>{(adj[x]=adj[x]||[]).push(y);(adj[y]=adj[y]||[]).push(x)};
+  for(let p=0;p<36;p++){
+    const ang=-Math.PI/2+p/36*2*Math.PI, seg=Math.floor(p/6), hq=(p%6===0);
+    const cat=hq?CATS[seg%6].id:CATS[(p+seg)%6].id;
+    nodes['R'+p]={x:cx+Rr*Math.cos(ang),y:cy+Rr*Math.sin(ang),cat,type:hq?'hq':'cat'};
+  }
+  for(let p=0;p<36;p++)link('R'+p,'R'+((p+1)%36));
+  nodes['H']={x:cx,y:cy,cat:null,type:'hub'};
+  for(let s=0;s<6;s++){
+    const rp=s*6+3, ang=-Math.PI/2+rp/36*2*Math.PI;
+    nodes['S'+s+'a']={x:cx+Ra*Math.cos(ang),y:cy+Ra*Math.sin(ang),cat:CATS[(s*2+2)%6].id,type:'cat'};
+    nodes['S'+s+'b']={x:cx+Rb*Math.cos(ang),y:cy+Rb*Math.sin(ang),cat:CATS[(s*2+4)%6].id,type:'cat'};
+    link('R'+rp,'S'+s+'a');link('S'+s+'a','S'+s+'b');link('S'+s+'b','H');
+  }
+  return {nodes,adj,cx,cy};
+})();
+/* toutes les cases atteignables en exactement `steps` pas, sans demi-tour immediat */
+function reachable(from,steps){
+  const res=new Set();
+  (function dfs(node,prev,left){
+    if(left===0){res.add(node);return}
+    for(const nx of BOARD.adj[node]){if(nx===prev)continue;dfs(nx,node,left-1)}
+  })(from,null,steps);
+  return [...res];
+}
+
+const newGame=(c,host)=>({code:c,host,status:'lobby',level:'e',board:false,order:[],turn:0,phase:'roll',moveN:null,options:null,q:null,result:null,used:[],winner:null,createdAt:Date.now()});
+const newPlayer=(id,name)=>({id,name,wedges:[],ok:0,ko:0,pos:'H',joinedAt:Date.now()});
 const activeId=()=>game&&game.order.length?game.order[game.turn%game.order.length]:null;
 const isMyTurn=()=>mode==='local'||activeId()===me.id;
 const isHost=()=>mode==='local'||(game&&game.board?screenFlag:(game&&game.host===me.id));
 const nm=id=>players[id]?players[id].name:'Joueur';
 const genCode=()=>{const L='ABCDEFGHJKLMNPQRSTUVWXYZ';let s='';for(let i=0;i<4;i++)s+=L[rnd(L.length)];return s};
+const hasAll=p=>(p.wedges||[]).length>=WEDGES_TO_WIN;
 
 async function saveGame(patch){
   Object.assign(game,patch);
@@ -545,8 +580,8 @@ async function startGame(){
   const ids=Object.keys(players);
   if(mode==='online'&&ids.length<2)return;
   if(!ids.length)return;
-  for(const id of ids)await savePlayer(id,{wedges:[],ok:0,ko:0});
-  await saveGame({status:'playing',order:shuffle(ids),turn:0,phase:'roll',q:null,result:null,used:[],winner:null});
+  for(const id of ids)await savePlayer(id,{wedges:[],ok:0,ko:0,pos:'H'});
+  await saveGame({status:'playing',order:shuffle(ids),turn:0,phase:'roll',moveN:null,options:null,q:null,result:null,used:[],winner:null});
 }
 
 function drawQuestion(catId,hard){
@@ -560,16 +595,34 @@ function drawQuestion(catId,hard){
   return {key,used};
 }
 
-async function roll(pick){
+/* 1) le joueur lance le de -> on calcule les cases possibles */
+async function rollDice(n){
   if(!game||game.phase!=='roll'||!isMyTurn())return;
-  const id=activeId(), p=players[id];
-  const final=p.wedges.length>=WEDGES_TO_WIN;
-  const cat=CATS[final?rnd(CATS.length):pick];
-  const wedge=!final&&!p.wedges.includes(cat.id)&&Math.random()<0.34;
+  const from=players[activeId()].pos||'H';
+  const options=reachable(from,n);
+  await saveGame({phase:'move',moveN:n,options,q:null,result:null});
+}
+
+/* 2) le joueur choisit sa case -> question, QG, ou centre */
+async function chooseMove(node){
+  if(!game||game.phase!=='move'||!isMyTurn())return;
+  if(!game.options||!game.options.includes(node))return;
+  const id=activeId();
+  await savePlayer(id,{pos:node});
+  const nd=BOARD.nodes[node], p=players[id];
+  if(nd.type==='hub'){
+    if(hasAll(p)){await startQuestion(CATS[rnd(CATS.length)].id,false,true);}
+    else{await saveGame({phase:'roll',moveN:null,options:null});toast('Au centre : relance le dé');}
+    return;
+  }
+  await startQuestion(nd.cat,nd.type==='hq',false);
+}
+
+async function startQuestion(catId,wedge,final){
   const hard=(game.level||'e')==='h';
-  const {key,used}=drawQuestion(cat.id,hard);
-  const q={cat:cat.id,key,wedge,final,hard,opts:shuffle([0,1,2,3]),t0:Date.now()};
-  await saveGame({phase:'question',q,used,result:null});
+  const {key,used}=drawQuestion(catId,hard);
+  const q={cat:catId,key,wedge:wedge&&!final,final,hard,opts:shuffle([0,1,2,3]),t0:Date.now()};
+  await saveGame({phase:'question',q,used,result:null,moveN:null,options:null});
 }
 
 async function answer(choice){
@@ -581,7 +634,7 @@ async function answer(choice){
     const result={choice,correct};
     if(correct){
       const patch={ok:(p.ok||0)+1};
-      if(q.wedge&&!p.wedges.includes(q.cat))patch.wedges=[...p.wedges,q.cat];
+      if(q.wedge&&!(p.wedges||[]).includes(q.cat))patch.wedges=[...(p.wedges||[]),q.cat];
       await savePlayer(id,patch);
     }else await savePlayer(id,{ko:(p.ko||0)+1});
     if(correct&&q.final)await saveGame({phase:'result',result,status:'finished',winner:id});
@@ -592,16 +645,16 @@ async function answer(choice){
 async function nextStep(){
   if(!game||game.phase!=='result'||!isMyTurn())return;
   const keep=game.result&&game.result.correct;
-  await saveGame({phase:'roll',q:null,result:null,turn:keep?game.turn:game.turn+1});
+  await saveGame({phase:'roll',q:null,result:null,moveN:null,options:null,turn:keep?game.turn:game.turn+1});
 }
 async function skipPlayer(){
   if(!isHost())return;
-  await saveGame({phase:'roll',q:null,result:null,turn:game.turn+1});
+  await saveGame({phase:'roll',q:null,result:null,moveN:null,options:null,turn:game.turn+1});
 }
 async function rematch(){
   if(!isHost())return;
-  for(const id of Object.keys(players))await savePlayer(id,{wedges:[],ok:0,ko:0});
-  await saveGame({status:'lobby',order:[],turn:0,phase:'roll',q:null,result:null,used:[],winner:null});
+  for(const id of Object.keys(players))await savePlayer(id,{wedges:[],ok:0,ko:0,pos:'H'});
+  await saveGame({status:'lobby',order:[],turn:0,phase:'roll',moveN:null,options:null,q:null,result:null,used:[],winner:null});
 }
 
 /* ============================================================
@@ -823,44 +876,34 @@ function board(){
 /* couleurs des pions (distinctes des couleurs de catégories) */
 const TOKCOL=['#ff5964','#ffffff','#00d4ff','#c8ff00','#ff9ff3','#ffb703','#a0e548','#ff7ad9'];
 
-/* Plateau visuel pour l'écran de l'ordinateur (mode plateau).
-   Les pions des joueurs se déplacent vers la catégorie tirée. */
+/* Plateau Trivial Pursuit : anneau de cases, 6 rayons, centre. */
 function boardPlateau(){
-  const C=210,Ro=196,Rhub=58,Ricon=150;
-  const aid=activeId();
-  const landed=(game.phase==='question'||game.phase==='result')&&game.q?game.q.cat:null;
-  // secteurs
-  let sec='';
-  CATS.forEach((c,i)=>{
-    const a0=-Math.PI/2+i*Math.PI/3,a1=a0+Math.PI/3,am=a0+Math.PI/6;
-    const x0=C+Ro*Math.cos(a0),y0=C+Ro*Math.sin(a0),x1=C+Ro*Math.cos(a1),y1=C+Ro*Math.sin(a1);
-    const ix=C+Ricon*Math.cos(am),iy=C+Ricon*Math.sin(am);
-    const hot=landed===c.id;
-    sec+=`<path d="M${C} ${C}L${x0.toFixed(1)} ${y0.toFixed(1)}A${Ro} ${Ro} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}Z" fill="${c.color}" fill-opacity="${hot?1:.82}" stroke="#fff" stroke-width="3"/>`;
-    sec+=`<text x="${ix.toFixed(1)}" y="${(iy-6).toFixed(1)}" font-size="34" text-anchor="middle" dominant-baseline="central">${c.icon}</text>`;
-    sec+=`<text x="${ix.toFixed(1)}" y="${(iy+22).toFixed(1)}" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">${esc(c.name)}</text>`;
+  const N=BOARD.nodes,A=BOARD.adj,aid=activeId();
+  const opts=(game.phase==='move'&&game.options)?game.options:[];
+  // liens
+  const seen={};let lines='';
+  Object.keys(A).forEach(id=>A[id].forEach(j=>{const k=id<j?id+'|'+j:j+'|'+id;if(seen[k])return;seen[k]=1;
+    lines+=`<line x1="${N[id].x.toFixed(1)}" y1="${N[id].y.toFixed(1)}" x2="${N[j].x.toFixed(1)}" y2="${N[j].y.toFixed(1)}" stroke="#cdbf9f" stroke-width="5" stroke-linecap="round"/>`;}));
+  // cases
+  let cells='';
+  Object.keys(N).forEach(id=>{const nd=N[id];
+    if(nd.type==='hub'){cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="44" fill="var(--ink)" stroke="#fff" stroke-width="3"/><text x="${nd.x}" y="${nd.y}" font-size="12" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">CENTRE</text>`;return}
+    const c=catById(nd.cat),r=nd.type==='hq'?19:12,hot=opts.includes(id);
+    if(hot)cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r+7}" fill="none" stroke="var(--ink)" stroke-width="3" stroke-dasharray="4 5" class="opt-ring"/>`;
+    cells+=`<circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="${c.color}" stroke="#fff" stroke-width="${nd.type==='hq'?3:2}"/>`;
+    if(nd.type==='hq')cells+=`<text x="${nd.x}" y="${nd.y}" font-size="18" text-anchor="middle" dominant-baseline="central">${c.icon}</text>`;
   });
-  // position des pions
-  const ids=game.order.filter(id=>players[id]);
-  const home=(idx,nn)=>{const an=-Math.PI/2+idx/Math.max(1,nn)*2*Math.PI;return[C+(Rhub-22)*Math.cos(an),C+(Rhub-22)*Math.sin(an)]};
-  const target=cat=>{const i=CATS.findIndex(c=>c.id===cat),am=-Math.PI/2+i*Math.PI/3+Math.PI/6;return[C+((Ro+Rhub)/2)*Math.cos(am),C+((Ro+Rhub)/2)*Math.sin(am)]};
+  // pions, groupés par case
+  const groups={};game.order.forEach((id,idx)=>{const p=players[id];if(!p)return;const pos=p.pos||'H';(groups[pos]=groups[pos]||[]).push({id,idx})});
   let toks='';
-  ids.forEach((id,idx)=>{
-    const p=players[id],col=TOKCOL[idx%TOKCOL.length],act=id===aid;
-    const [hx,hy]=home(idx,ids.length);
-    const onCat=act&&landed;
-    const [tx,ty]=onCat?target(landed):[hx,hy];
-    const ini=esc((p.name||'?').slice(0,2).toUpperCase());
-    const ring=act?`<circle r="21" fill="none" stroke="#fff" stroke-width="3"/>`:'';
-    const move=onCat?`<animateMotion dur="0.6s" fill="freeze" path="M${(hx-tx).toFixed(1)} ${(hy-ty).toFixed(1)} L0 0"/>`:'';
-    toks+=`<g transform="translate(${tx.toFixed(1)} ${ty.toFixed(1)})">${move}${ring}<circle r="16" fill="${col}" stroke="#15151f" stroke-width="2"/><text y="1" font-size="12" font-weight="800" fill="#15151f" text-anchor="middle" dominant-baseline="central">${ini}</text></g>`;
+  Object.keys(groups).forEach(pos=>{const arr=groups[pos],base=N[pos]||N['H'];
+    arr.forEach((o,k)=>{const an=k/arr.length*2*Math.PI,off=arr.length>1?14:0;
+      const x=base.x+off*Math.cos(an),y=base.y+off*Math.sin(an);
+      const col=TOKCOL[o.idx%TOKCOL.length],act=o.id===aid,ini=esc((players[o.id].name||'?').slice(0,2).toUpperCase());
+      toks+=`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">${act?'<circle r="17" fill="none" stroke="var(--ink)" stroke-width="3"/>':''}<circle r="12" fill="${col}" stroke="#15151f" stroke-width="2"/><text y="1" font-size="10" font-weight="800" fill="#15151f" text-anchor="middle" dominant-baseline="central">${ini}</text></g>`;
+    });
   });
-  return `<div class="plateau"><svg viewBox="0 0 ${C*2} ${C*2}" aria-hidden="true">
-    ${sec}
-    <circle cx="${C}" cy="${C}" r="${Rhub}" fill="var(--ink)" stroke="#fff" stroke-width="3"/>
-    <text x="${C}" y="${C}" font-size="15" font-weight="700" fill="var(--bg)" text-anchor="middle" dominant-baseline="central">DÉPART</text>
-    ${toks}
-  </svg></div>`;
+  return `<div class="plateau"><svg viewBox="0 0 460 460" aria-hidden="true">${lines}${cells}${toks}</svg></div>`;
 }
 
 function viewGame(){
@@ -868,22 +911,42 @@ function viewGame(){
   if(!ap)return `<div class="card center"><p>Synchronisation…</p></div>`;
   let main='';
   if(game.phase==='roll')main=viewRoll(ap);
+  else if(game.phase==='move')main=viewMove(ap);
   else main=viewQuestion(ap);
   const foot=`<div class="row" style="margin-top:18px">${isHost()&&mode==='online'?`<button class="btn small alt" data-act="skip">Passer ${esc(ap.name)}</button>`:'<span></span>'}<button class="btn small alt" data-act="leave" style="margin-left:auto;flex:0 0 auto">Quitter</button></div>`;
   if(screenFlag&&mode==='online')return `<div class="screengame">${boardPlateau()}<div class="screencol">${board()}${main}</div></div>${foot}`;
-  return board()+main+foot;
+  return boardPlateau()+board()+main+foot;
 }
+
+function dieFace(n){return `<div class="die">${'⚀⚁⚂⚃⚄⚅'[(n||1)-1]||'🎲'}</div>`}
 
 function viewRoll(ap){
   const mine=isMyTurn();
-  const final=ap.wedges.length>=WEDGES_TO_WIN;
-  const chips=CATS.map((c,i)=>`<div class="chip ${rolling?(rolling.on===i?'on':''):'idle'} ${ap.wedges.includes(c.id)?'own':''}" style="background:${c.color}"><span class="ic">${c.icon}</span>${c.name}</div>`).join('');
+  const final=hasAll(ap);
+  const rolling_n=rolling&&rolling.die;
   return `<div class="card center" style="margin-top:6px">
-    <p class="muted" style="margin:0">${mine?(mode==='local'?`Au tour de`:'À toi de jouer,'):'Au tour de'}</p>
+    <p class="muted" style="margin:0">${mine?(mode==='local'?'Au tour de':'À toi de jouer,'):'Au tour de'}</p>
     <h1 style="margin:0 0 4px">${esc(ap.name)}</h1>
-    ${final?'<p><b>🏆 Les six camemberts sont là ! Prochaine question : la finale.</b></p>':`<p class="muted" style="margin:0">${ap.wedges.length} camembert${ap.wedges.length>1?'s':''} sur ${WEDGES_TO_WIN}</p>`}
-    <div class="chips">${chips}</div>
+    ${final?'<p><b>🏆 Les six camemberts ! Rejoins le CENTRE pour la finale.</b></p>':`<p class="muted" style="margin:0">${(ap.wedges||[]).length} camembert${(ap.wedges||[]).length>1?'s':''} sur ${WEDGES_TO_WIN}</p>`}
+    ${rolling_n?dieFace(rolling_n):''}
     ${mine?`<button class="btn" data-act="roll" ${rolling?'disabled':''}>🎲 Lancer le dé</button>`:`<p class="muted">${esc(ap.name)} s'apprête à lancer le dé…</p>`}
+  </div>`;
+}
+
+function viewMove(ap){
+  const mine=isMyTurn();
+  const opts=game.options||[];
+  // regrouper les options par case pour un libellé clair
+  const seen={};const list=opts.filter(id=>{if(seen[id])return false;seen[id]=1;return true}).map(id=>{
+    const nd=BOARD.nodes[id];
+    if(nd.type==='hub')return {id,label:'🏁 CENTRE'+(hasAll(ap)?' — Finale !':' — relance'),tag:'centre'};
+    const c=catById(nd.cat);
+    return {id,label:`${c.icon} ${c.name}`,tag:nd.type==='hq'?'QG — camembert':'',color:c.color};
+  });
+  const btns=list.map(o=>`<button class="opt move" data-act="move" data-node="${o.id}" ${mine?'':'disabled'}><span class="l" style="background:${o.color||'var(--ink)'}">→</span><span>${o.label}${o.tag?` <small class="muted">(${o.tag})</small>`:''}</span></button>`).join('');
+  return `<div class="card" style="margin-top:6px">
+    <div class="center"><p class="muted" style="margin:0">${esc(ap.name)} a fait</p>${dieFace(game.moveN)}<p class="muted" style="margin:0 0 4px">Choisis ta case</p></div>
+    ${mine?btns:`<p class="muted center">${esc(ap.name)} déplace son pion…</p>`}
   </div>`;
 }
 
@@ -944,13 +1007,13 @@ function syncTimer(){
 
 function startRoll(){
   if(rolling||!isMyTurn()||game.phase!=='roll')return;
-  const pick=rnd(CATS.length);let n=0;const steps=10+rnd(4);
-  rolling={on:rnd(CATS.length)};render();
+  let n=0;const steps=8+rnd(4);
+  rolling={die:1+rnd(6)};render();
   const iv=setInterval(()=>{
     n++;
-    if(n>=steps){clearInterval(iv);rolling={on:pick};render();setTimeout(()=>{rolling=null;roll(pick)},550);return}
-    rolling={on:(rolling.on+1+rnd(2))%CATS.length};render();
-  },100+n*6);
+    if(n>=steps){clearInterval(iv);const fin=1+rnd(6);rolling={die:fin};render();setTimeout(()=>{rolling=null;rollDice(fin)},480);return}
+    rolling={die:1+rnd(6)};render();
+  },90+n*5);
 }
 
 document.addEventListener('click',e=>{
@@ -966,6 +1029,7 @@ document.addEventListener('click',e=>{
   else if(a==='level'){if(isHost())saveGame({level:b.dataset.lv})}
   else if(a==='start')startGame();
   else if(a==='roll')startRoll();
+  else if(a==='move')chooseMove(b.dataset.node);
   else if(a==='ans')answer(+b.dataset.i);
   else if(a==='next')nextStep();
   else if(a==='skip')skipPlayer();
