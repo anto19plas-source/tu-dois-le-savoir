@@ -669,7 +669,7 @@ Object.keys(MORE3).forEach(k=>{BANK[k].e.push(...MORE3[k].e);BANK[k].h.push(...M
 const QTIME=30;            // secondes pour répondre
 const WEDGES_TO_WIN=CATS.length;
 const MAXP=8;              // joueurs maximum
-const VERSION='v9-2026-11-19';  // repère de version (doit être identique sur tous les appareils)
+const VERSION='v10-2026-11-20';  // repère de version (doit être identique sur tous les appareils)
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rnd=n=>Math.floor(Math.random()*n);
@@ -1141,7 +1141,7 @@ function boardPlateau(){
     const r=nd.type==='hq'?30:(id[0]==='S'?20:24);
     if(hot)glows+=glow(nd.x,nd.y,r);
     if(id[0]==='S'){
-      cells+=tri(nd.x,nd.y,a,16,`fill="${fill}" stroke="${DARK}" stroke-width="2" stroke-linejoin="round"${got?' opacity="0.65"':''}`);
+      cells+=rrot(nd.x,nd.y,32,28,deg,`fill="${fill}" stroke="${DARK}" stroke-width="2"`);
     }else if(nd.type==='hq'){
       cells+=rrot(nd.x,nd.y,48,42,deg,`fill="${fill}" stroke="${DARK}" stroke-width="2.6"${got?' opacity="0.65"':''}`);
       cells+=`<text x="${nd.x}" y="${nd.y}" font-size="24" text-anchor="middle" dominant-baseline="central"${got?' opacity="0.5"':''}>${c.icon}</text>`;
